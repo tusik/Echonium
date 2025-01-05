@@ -1,18 +1,58 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use duckdb::{params, DuckdbConnectionManager};
 use once_cell::sync::Lazy;
-use sqlx::sqlite::SqlitePool;
+use r2d2::Pool;
+
 pub mod handler;
 
-static POOL: Lazy<Mutex<SqlitePool>> = Lazy::new(|| {
-    panic!("Database pool not initialized!");
+static POOL: Lazy<Arc<Mutex<Option<Pool<DuckdbConnectionManager>>>>> = Lazy::new(|| {
+    Arc::new(Mutex::new(None))
 });
 
-pub fn init_pool(pool: SqlitePool) {
-    let mut p = POOL.lock().unwrap();
-    *p = pool;
+pub fn create_pool(url: String) -> bool {
+    let mgr = DuckdbConnectionManager::file(url).unwrap();
+
+    let pool = r2d2::Pool::builder()
+        .max_size(15)
+        .build(mgr)
+        .expect("Failed to create pool");
+
+    // 使用 Mutex 的 lock 方法获取可变引用，并修改 POOL
+    let mut pool_guard = POOL.lock().unwrap();
+    *pool_guard = Some(pool);
+
+    true
 }
 
-pub fn create_pool(url: String) -> SqlitePool {
-    let pool = SqlitePool::connect(url.as_str()).expect("TODO: panic message");
-    pool
+// 检查是否存在某张数据表
+pub fn check_table_exist(table_name: &str) -> bool {
+    let pool_guard = POOL.lock().unwrap();
+    let pool = pool_guard.as_ref().unwrap();
+
+    let conn = pool.get().unwrap();
+    let mut stmt = conn.prepare("SELECT count(*) FROM information_schema.tables WHERE table_name = ?").unwrap();
+    let mut rows = stmt.query_map(&[&table_name], |row|{
+        Ok(row.get::<_, i32>(0)?)
+    }).unwrap();
+    let count = rows.next().unwrap().unwrap();
+    count > 0
+}
+
+pub fn init_table() {
+    let pool_guard = POOL.lock().unwrap();
+    let pool = pool_guard.as_ref().unwrap();
+
+    let conn = pool.get().unwrap();
+    conn.execute("CREATE SEQUENCE IF NOT EXISTS ping_id_seq START 1;", params![])
+        .unwrap();
+    conn.execute("\
+        CREATE TABLE IF NOT EXISTS main.ping_data (\
+        id INTEGER DEFAULT nextval('ping_id_seq'), \
+        host TEXT, latency double, \
+        iface TEXT, \
+        timeout BOOL, \
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+                 [])
+        .unwrap();
+    
 }
