@@ -2,13 +2,26 @@ use std::sync::{Arc, Mutex};
 use duckdb::{params, DuckdbConnectionManager};
 use once_cell::sync::Lazy;
 use r2d2::Pool;
+use chrono::NaiveDateTime;
+use duckdb::arrow::datatypes::Date32Type;
+use duckdb::ffi::{duckdb_time, duckdb_timestamp};
+use serde::{Deserialize, Serialize};
 
 pub mod handler;
 
 static POOL: Lazy<Arc<Mutex<Option<Pool<DuckdbConnectionManager>>>>> = Lazy::new(|| {
     Arc::new(Mutex::new(None))
 });
-
+#[derive(Debug,Deserialize,Serialize)]
+pub struct PingData{
+    host: String,
+    avg_latency: f64,
+    max_latency: f64,
+    min_latency: f64,
+    iface: String,
+    loss: f64,
+    time: i32,
+}
 pub fn create_pool(url: String) -> bool {
     let mgr = DuckdbConnectionManager::file(url).unwrap();
 

@@ -13,6 +13,24 @@ async fn index() -> Html<String> {
     Html(template.render().unwrap())
 }
 
+pub mod api{
+    use crate::database::handler::select_ping_data_day;
+    pub(crate) async fn group_by_day() -> String {
+        match select_ping_data_day(){
+            Ok(data) => {
+                let json = serde_json::to_string(&data).unwrap();
+                json
+            }
+            Err(e) => {
+                println!("error: {:?}", e);
+                "[]".to_string()
+            }
+        }
+
+
+    }
+}
 pub fn create_router() -> Router {
     Router::new().route("/ping", get(index))
+        .route("/api/ping/day", get(api::group_by_day))
 }

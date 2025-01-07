@@ -15,6 +15,7 @@ pub(crate) struct PingConfig {
 }
 #[derive(Debug, Deserialize,Serialize,Clone)]
 pub(crate) struct PingTarget{
+    pub title:Option<String>,
     pub host:String,
     pub size:usize,
     pub iface:Option<String>,
