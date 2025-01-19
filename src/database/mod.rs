@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use duckdb::{params, DuckdbConnectionManager};
 use once_cell::sync::Lazy;
 use r2d2::Pool;
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use duckdb::arrow::datatypes::Date32Type;
 use duckdb::ffi::{duckdb_time, duckdb_timestamp};
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ pub struct PingData{
     min_latency: f64,
     iface: String,
     loss: f64,
-    time: i32,
+    time: Option<String>
 }
 pub fn create_pool(url: String) -> bool {
     let mgr = DuckdbConnectionManager::file(url).unwrap();
@@ -59,12 +59,12 @@ pub fn init_table() {
     conn.execute("CREATE SEQUENCE IF NOT EXISTS ping_id_seq START 1;", params![])
         .unwrap();
     conn.execute("\
-        CREATE TABLE IF NOT EXISTS main.ping_data (\
-        id INTEGER DEFAULT nextval('ping_id_seq'), \
-        host TEXT, latency double, \
-        iface TEXT, \
-        timeout BOOL, \
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+        CREATE TABLE ping_data(id INTEGER DEFAULT(nextval('ping_id_seq')),
+        host VARCHAR,
+        latency DOUBLE,
+        iface VARCHAR,
+        timeout BOOLEAN,
+        created_at TIMESTAMP DEFAULT(CURRENT_TIMESTAMP));",
                  [])
         .unwrap();
     

@@ -15,7 +15,7 @@ pub fn insert_ping_data(data: PingResult) -> duckdb::Result<usize> {
 
 }
 
-pub fn select_ping_data_day() -> Result<Vec<PingData>, Error> {
+pub fn select_ping_data_day(host:String, start:String) -> Result<Vec<PingData>, Error> {
     let pool_guard = POOL.lock().unwrap();
     let pool = pool_guard.as_ref().unwrap();
 
@@ -29,14 +29,17 @@ pub fn select_ping_data_day() -> Result<Vec<PingData>, Error> {
     FROM
         ping_data
     WHERE
-        created_at > '2021-01-01'
+        created_at > CAST(? AS TIMESTAMP)
+        and host = ?
     GROUP BY
         day
     ORDER BY
         day;")?;
     let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
-    let rows = stmt.query_map([], |row|{
+    let rows = stmt.query_map([start,host], |row|{
+        let day_timestamp: i64 = row.get(0)?; // Assuming the date is returned as a timestamp
+        let day = NaiveDateTime::from_timestamp(day_timestamp*24*60*60, 0);
         Ok(
             PingData{
                 host: "".to_string(),
@@ -45,7 +48,7 @@ pub fn select_ping_data_day() -> Result<Vec<PingData>, Error> {
                 min_latency: row.get(3)?,
                 iface: "".to_string(),
                 loss: row.get(4)?,
-                time: row.get(0)?,
+                time: Some(day.to_string()),
             }
         )
     })?;
